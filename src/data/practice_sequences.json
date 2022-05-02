@@ -1,14 +1,14 @@
 [
     {
-        "circlePathDiamater": 300,
-        "radius": 20,
+        "circlePathDiamater": 600,
+        "radius": 40,
         "count": 9,
         "repetitions": 15,
         "direction": 1
     },
     {
-        "circlePathDiamater": 600,
-        "radius": 40,
+        "circlePathDiamater": 300,
+        "radius": 20,
         "count": 9,
         "repetitions": 15,
         "direction": 1

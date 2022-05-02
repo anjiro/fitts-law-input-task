@@ -11,17 +11,20 @@ export class Login extends Component {
 
         this.state = {
             username: '',
-            device: ''
+            device: '',
+						fittsParams: props.fittsParams
         }
     }
 
     onChange = (e) => {
+				console.log("State:", this.state);
         this.setState({ 
             [e.target.name]: e.target.value 
         }, () => {
             this.props.onChange({
                 username: this.state.username,
-                device: this.state.device
+                device: this.state.device,
+								fittsParams: this.state.fittsParams
             })
         });
     }
@@ -31,11 +34,11 @@ export class Login extends Component {
             <Form onSubmit={this.onSubmit}>
                 <Form.Row>
                     <Form.Group as={Col} md="6" controlId="loginForm.ControlInputUsername">
-                        <Form.Label>Username</Form.Label>
+                        <Form.Label>Condition</Form.Label>
                         <Form.Control
                             required
                             type="text"
-                            placeholder="Username"
+                            placeholder="Condition"
                             name="username"
                             defaultValue=""
                             onChange={this.onChange}
@@ -44,6 +47,7 @@ export class Login extends Component {
                             Please enter your username
                         </Form.Control.Feedback>
                     </Form.Group>
+										{/*
                     <Form.Group as={Col} md="6" controlId="loginForm.ControlInputDevice">
                         <Form.Label>Device</Form.Label>
                         <Form.Control 
@@ -62,7 +66,20 @@ export class Login extends Component {
                             Please select your input device
                         </Form.Control.Feedback>
                     </Form.Group>
+										*/}
                 </Form.Row>
+								<Form.Row>
+										<Form.Group as={Col} md="12" controlId="loginForm.ControlFittsParams">
+												<Form.Label>Fitts Parameters</Form.Label>
+												<Form.Control
+														required
+														as="textarea"
+														defaultValue={this.state.fittsParams}
+														name="fittsParams"
+														onChange={this.onChange}
+												/>
+										</Form.Group>
+								</Form.Row>
             </Form>
         )
     }

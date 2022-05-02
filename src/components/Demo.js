@@ -16,7 +16,7 @@ export class Demo extends Component {
         this.state = {
             isActive: false,
             isComplete : false,
-            isPractice: null,
+            isPractice: false,
             username: '',
             device: '',
             sequences: null,
@@ -25,16 +25,28 @@ export class Demo extends Component {
             currentSequenceIndex: 0,
             currentRepetition: 1,
             currentCircleIndex: 0,
-            previousCircleIndex: null
+            previousCircleIndex: null,
+						fittsParams: TestSequences.map(x => [x.circlePathDiamater, x.radius*2]),
+						numCircles: 9,
+						numClicks: 10,
+						direction: 1,
+						lastCircleClick: {x: null, y: null}
         }
     }
 
     resetTest = () => {
 
-        let isPractice = this.state.isPractice == null ? true : !this.state.isPractice;
+        //let isPractice = this.state.isPractice == null ? true : !this.state.isPractice;
+        let isPractice = false;
+				let sequences = isPractice ? PracticeSequences : TestSequences;
+				let maxCircleDiam = Math.max(...sequences.map(x => x.circlePathDiamater + x.radius*2))
+				let minSize = Math.min(this.container.clientWidth, this.container.clientHeight)
+				let scale =  minSize > maxCircleDiam ? 1 : minSize / maxCircleDiam
+
         this.setState({
             isPractice,
-            sequences: isPractice ? PracticeSequences : TestSequences,
+            sequences,
+						scale,
             username: '',
             device: '',
             isActive: false,
@@ -44,7 +56,7 @@ export class Demo extends Component {
             currentSequenceIndex: 0,
             currentRepetition: 1,
             currentCircleIndex: 0,
-            previousCircleIndex: null
+            previousCircleIndex: null,
         }, () => {
             this.generateCircleData();
         });
@@ -95,11 +107,30 @@ export class Demo extends Component {
         this.timeElapsed = performance.now() - this.startTime;
     }
 
+		generateNewSequences = (fittsParams) => {
+			return fittsParams
+				.split('\n')
+				.filter(l => l.trim())
+				.map(l => l
+					.split(',')
+					.filter(w => w.trim())
+					.map(Number))
+				.filter(nums => nums.length > 1)
+				.map(fp => ({
+						circlePathDiamater: fp[0],
+						radius: fp[1],
+						count: this.state.numCircles,
+						repetitions: this.state.numClicks,
+						direction: this.state.direction
+					}))
+		}
+
     onLoginDetailsChange = (loginData) => {
         this.setState({
             username: loginData.username,
-            device: loginData.device
-        })
+            device: loginData.device,
+						sequences: this.generateNewSequences(loginData.fittsParams)
+				}, () => { this.generateCircleData(); });
     }
 
     skipPractice = () => {
@@ -131,23 +162,13 @@ export class Demo extends Component {
         if (!this.state.isActive)
             return;
 
+				console.log("Circle click", d, i);
+
         let hit = i === this.state.currentCircleIndex;
         if (hit) this.stopTimer();
 
         let si = this.state.currentSequenceIndex;
-        let c = {
-            x: this.state.generated[si].circles[this.state.currentCircleIndex].x,
-            y: this.state.generated[si].circles[this.state.currentCircleIndex].y
-        };
-        let p = this.state.previousCircleIndex !== null ? {
-            x: this.state.generated[si].circles[this.state.previousCircleIndex].x,
-            y: this.state.generated[si].circles[this.state.previousCircleIndex].y
-        } : {
-            x: this.container.clientWidth / 2,
-            y: this.container.clientHeight / 2
-        };
-
-        let distanceFromPrevious = this.calculateDistance(c.x, p.x, c.y, p.y);
+				let c = d == null ? {x: null, y: null} : {x: d.x, y: d.y};
 
         const s = this.state.sequences[si];
 
@@ -157,11 +178,13 @@ export class Demo extends Component {
             this.state.currentSequenceIndex + 1,
             this.state.currentRepetition,
             s.circlePathDiamater,
-            distanceFromPrevious,
+            //distanceFromPrevious,
+						null,
             s.radius,
             s.direction,
             hit,
-            this.timeElapsed
+            this.timeElapsed,
+						c.x, c.y
         );
 
         if (hit) {
@@ -199,7 +222,8 @@ export class Demo extends Component {
         }
     }
 
-    appendResultLog = (username, device, sequence, rep, circlePathDiamater, distanceFromPrevious, radius, direction, hit, time) => {
+		appendResultLog = (username, device, sequence, rep, circlePathDiamater,
+			distanceFromPrevious, radius, direction, hit, time, hitX, hitY) => {
 
         let existingLog = false;
         var modifiedResults = this.state.results.map(l => {
@@ -222,24 +246,16 @@ export class Demo extends Component {
             });
         } else {
 
-            let id = Math.log2(distanceFromPrevious / (radius * 2));
-            let ip = id / time;
-
             this.setState(prevState => ({
                 results: [...prevState.results, {
-                    username, 
-                    device, 
+										condition: username, 
                     sequence, 
                     rep, 
-                    circlePathDiamater,
-                    distanceFromPrevious, 
+										circlePathDiameter: circlePathDiamater,
                     radius,
-                    id,
-                    ip,
-                    direction, 
                     hit, 
+										hitX, hitY,
                     time, 
-                    misses: hit ? 0 : 1, 
                     timestamp: Date.now()
                 }]
             }));
@@ -251,30 +267,31 @@ export class Demo extends Component {
     }
     
     generateCircleData = () => {
+				console.log("Sequences:", this.state.sequences);
+				if(this.state.sequences.length > 0) {
+					this.setState({
+							generated: this.state.sequences.map((s) => {
+									
+									let rev = Math.PI * 2;
+									let center = {
+											x: this.container.clientWidth / 2,
+											y: this.container.clientHeight / 2
+									}
 
-        this.setState({
-            generated: this.state.sequences.map((s) => {
-                
-                let rev = Math.PI * 2;
-                let center = {
-                    x: this.container.clientWidth / 2,
-                    y: this.container.clientHeight / 2
-                }
-
-                return {
-                    circles: Array(s.count).fill().map((_, i) => {
-                        let rotationOffset = Math.PI * 1.5;
-                        return {
-                            x: center.x + Math.cos(rotationOffset + i * (rev / s.count)) * s.circlePathDiamater / 2,
-                            y: center.y + Math.sin(rotationOffset + i * (rev / s.count)) * s.circlePathDiamater / 2,
-                            radius: s.radius,
-                            color: 'lightgray',
-                            activeColor: 'crimson'
-                        }
-                    })
-                }
-            })
-        }, this.renderCircles);
+									return {
+											circles: Array(s.count).fill().map((_, i) => {
+													let rotationOffset = Math.PI * 1.5;
+													return {
+															x: center.x + Math.cos(rotationOffset + i * (rev / s.count)) * this.state.scale * s.circlePathDiamater / 2,
+															y: center.y + Math.sin(rotationOffset + i * (rev / s.count)) * this.state.scale * s.circlePathDiamater / 2,
+															radius: s.radius * this.state.scale,
+															color: 'lightgray',
+															activeColor: 'crimson'
+													}
+											})
+									}
+							})
+					}, this.renderCircles)};
     }
 
     renderCircles = () => {
@@ -366,7 +383,11 @@ export class Demo extends Component {
                     </Modal.Header>
                     <Modal.Body>
                         {
-                            !this.inSequence() && !this.state.isComplete && <Login onChange={this.onLoginDetailsChange}/>
+														!this.inSequence() && !this.state.isComplete &&
+														<Login
+															onChange={this.onLoginDetailsChange}
+															fittsParams={this.state.fittsParams ? this.state.fittsParams.map(a => a.join(",")).join("\n") : ""}
+														/>
                         }
                         { 
                             this.inSequence() ? 
@@ -379,7 +400,7 @@ export class Demo extends Component {
                         {
                             !this.state.isComplete &&
                             <React.Fragment>
-                                <Button variant="primary" onClick={this.resumeTest} disabled={!this.state.username || !this.state.device}>
+                                <Button variant="primary" onClick={this.resumeTest} disabled={!this.state.username }>
                                     { this.inSequence() ? 'Proceed' : (this.state.isPractice ? 'Begin practice' : 'Begin test')  }
                                 </Button>
                             </React.Fragment>
